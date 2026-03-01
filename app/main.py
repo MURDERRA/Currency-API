@@ -1,11 +1,25 @@
 import logging
 import logging.handlers
 from pathlib import Path
+from datetime import datetime, timezone, timedelta
 from apscheduler.schedulers.blocking import BlockingScheduler
 
 from app.config import FETCH_INTERVAL_MINUTES
 from app.database import init_db
 from app.fetcher import fetch_and_save
+
+MSK = timezone(timedelta(hours=3))
+
+
+def log_next_run():
+    logger = logging.getLogger(__name__)
+    now = datetime.now(timezone.utc)
+    next_run = now + timedelta(minutes=FETCH_INTERVAL_MINUTES)
+    logger.info(
+        "Next run at %s UTC / %s MSK",
+        next_run.strftime("%H:%M:%S"),
+        next_run.astimezone(MSK).strftime("%H:%M:%S"),
+    )
 
 
 def setup_logging():
@@ -46,16 +60,18 @@ def main():
     logger.info("Starting currency tracker")
     init_db()
 
-    # первый запуск сразу, потом по расписанию
     fetch_and_save()
+    log_next_run()
 
     scheduler = BlockingScheduler()
-    scheduler.add_job(
-        fetch_and_save,
-        trigger="interval",
-        minutes=FETCH_INTERVAL_MINUTES,
-        id="fetch_rates",
-    )
+    scheduler.add_job(fetch_and_save,
+                      trigger="interval",
+                      minutes=FETCH_INTERVAL_MINUTES,
+                      id="fetch_rates")
+    scheduler.add_job(log_next_run,
+                      trigger="interval",
+                      minutes=FETCH_INTERVAL_MINUTES,
+                      id="log_next_run")
 
     logger.info("Scheduler started, interval: %d min", FETCH_INTERVAL_MINUTES)
     try:
