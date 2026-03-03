@@ -21,7 +21,9 @@ services:
       - currency-net
 
   app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     restart: unless-stopped
     depends_on:
       db:
@@ -31,6 +33,20 @@ services:
       POSTGRES_HOST: db
     volumes:
       - ./logs:/app/logs
+    networks:
+      - currency-net
+
+  bot:
+    build:
+      context: .
+      dockerfile: bot/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      POSTGRES_HOST: db
     networks:
       - currency-net
 
